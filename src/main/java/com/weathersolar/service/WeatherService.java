@@ -73,6 +73,8 @@ public class WeatherService {
                    double maxTemp = daily.get("temperature_2m_max").get(i).asDouble();
                    double minTemp = daily.get("temperature_2m_min").get(i).asDouble();
                    
+                   double daylightHours = daily.get("daylight_duration").get(i).asDouble() / 3600;
+
                    LocalTime sunrise = LocalTime.parse(daily.get("sunrise").get(i).asText().split("T")[1]);
                    LocalTime sunset = LocalTime.parse(daily.get("sunset").get(i).asText().split("T")[1]);
                    
@@ -85,6 +87,7 @@ public class WeatherService {
                        .minTemperature(minTemp)
                        .maxTemperature(maxTemp)
                        .solarEnergy(solarEnergy)
+                       .daylightHours(daylightHours)
                        .build());
                    
                } catch (Exception e) {

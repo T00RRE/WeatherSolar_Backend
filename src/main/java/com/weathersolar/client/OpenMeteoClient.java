@@ -35,7 +35,7 @@ public class OpenMeteoClient {
                 .path(path)
                 .queryParam("latitude", latitude)
                 .queryParam("longitude", longitude)
-                .queryParam("daily", "weathercode,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_hours")
+                .queryParam("daily", "weathercode,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_hours,daylight_duration")
                 .queryParam("timezone", "auto")  // Zmienione z UTC na auto
                 .queryParam("forecast_days", "7")
                 .build())

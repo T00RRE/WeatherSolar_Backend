@@ -16,4 +16,5 @@ public class DailyWeather {
     private double minTemperature;
     private double maxTemperature;
     private double solarEnergy;
+    private double daylightHours;
 }
