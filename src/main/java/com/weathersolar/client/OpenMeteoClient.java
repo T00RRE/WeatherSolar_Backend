@@ -36,7 +36,7 @@ public class OpenMeteoClient {
                 .queryParam("latitude", latitude)
                 .queryParam("longitude", longitude)
                 .queryParam("daily", "weathercode,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_hours,daylight_duration")
-                .queryParam("timezone", "auto")  // Zmienione z UTC na auto
+                .queryParam("timezone", "auto")  
                 .queryParam("forecast_days", "7")
                 .build())
             .retrieve()
@@ -60,7 +60,7 @@ public class OpenMeteoClient {
                 .queryParam("latitude", latitude)
                 .queryParam("longitude", longitude)
                 .queryParam("hourly", "pressure_msl")
-                .queryParam("timezone", "auto")  // Zmienione z UTC na auto
+                .queryParam("timezone", "auto")  
                 .queryParam("forecast_days", "7")
                 .build())
             .retrieve()
