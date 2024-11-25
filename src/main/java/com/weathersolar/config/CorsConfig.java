@@ -15,7 +15,13 @@ public class CorsConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/api/**")
-            .allowedOrigins("http://localhost:5173")
+            .allowedOrigins(
+                "http://localhost:5173",
+                "http://localhost:5174",
+                "https://weather-app-backend-f2mz.onrender.com",
+                "https://weather-app-frontend-wheat.vercel.app",
+                "https://weather-app-frontend-4pp2.onrender.com"
+            )
             .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
             .allowedHeaders("*")
             .allowCredentials(true)
