@@ -146,14 +146,15 @@ public class WeatherService {
             int weatherCode = daily.get("weathercode").get(dayIndex).asInt();
             double maxTemp = daily.get("temperature_2m_max").get(dayIndex).asDouble();
             double minTemp = daily.get("temperature_2m_min").get(dayIndex).asDouble();
-            
             double daylightHours = daily.get("daylight_duration").get(dayIndex).asDouble() / 3600;
 
             LocalTime sunrise = LocalTime.parse(daily.get("sunrise").get(dayIndex).asText().split("T")[1]);
             LocalTime sunset = LocalTime.parse(daily.get("sunset").get(dayIndex).asText().split("T")[1]);
-            
+
             double sunExposureHours = calculateSunExposureHours(sunrise, sunset);
             double solarEnergy = solarEnergyCalculator.calculateDailySolarEnergy(sunExposureHours);
+
+            log.info("Dzien {}: sunrise={}, sunset={}, sunExposureHours={}, solarEnergy={}", dayIndex, sunrise, sunset, sunExposureHours, solarEnergy);
 
             return DailyWeather.builder()
                 .date(date)
@@ -175,7 +176,7 @@ public class WeatherService {
 
     private double calculateSunExposureHours(LocalTime sunrise, LocalTime sunset) {
         try {
-            return Duration.between(sunrise, sunset).toHours();
+            return Duration.between(sunrise, sunset).toMinutes() / 60.0;
         } catch (Exception e) {
             log.error("Error calculating sun exposure hours: {}", e.getMessage());
             throw new WeatherDataProcessingException("Error calculating sun exposure", e);
