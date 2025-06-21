@@ -20,7 +20,7 @@ public class OpenMeteoClient {
     private final String baseUrl;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_DATE;
 
-    public OpenMeteoClient(WebClient.Builder webClientBuilder, @Value("${zew.api.url}") String baseUrl) {
+    public OpenMeteoClient(WebClient.Builder webClientBuilder, @Value("${openmeteo.api.url}") String baseUrl) {
         this.baseUrl = baseUrl;
         this.webClient = webClientBuilder
             .baseUrl(baseUrl)
