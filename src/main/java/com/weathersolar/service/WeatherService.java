@@ -8,12 +8,17 @@ import java.util.stream.IntStream;
 import java.util.stream.StreamSupport;
 
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
+import org.springframework.web.reactive.function.client.WebClientException;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.weathersolar.Model.DailyWeather;
 import com.weathersolar.client.OpenMeteoClient;
 import com.weathersolar.dto.WeatherForecastResponse;
 import com.weathersolar.dto.WeeklySummaryResponse;
+import com.weathersolar.exception.ExternalServiceException;
+import com.weathersolar.exception.LocationValidationException;
+import com.weathersolar.exception.WeatherDataProcessingException;
 import com.weathersolar.utils.SolarEnergyCalculator;
 
 import lombok.RequiredArgsConstructor;
@@ -27,32 +32,84 @@ public class WeatherService {
     private JsonNode pressureData;
 
     public WeatherForecastResponse getForecast(double latitude, double longitude) {
+        validateLocation(latitude, longitude);
+        
         try {
             log.info("Fetching forecast for lat: {}, lon: {}", latitude, longitude);
             
-            JsonNode weatherData = meteoClient.getWeatherForecast(latitude, longitude)
-                .block(Duration.ofSeconds(10));
+            JsonNode weatherData = fetchWeatherData(latitude, longitude);
+            this.pressureData = fetchPressureData(latitude, longitude);
             
-            if (weatherData == null || !weatherData.has("daily")) {
-                log.error("Invalid weather data received from API");
-                throw new RuntimeException("Invalid weather data received from API");
-            }
-
-            this.pressureData = meteoClient.getPressureData(latitude, longitude)
-                .block(Duration.ofSeconds(10));
-            
-            if (this.pressureData == null || !this.pressureData.has("hourly")) {
-                log.error("Invalid pressure data received from API");
-                throw new RuntimeException("Invalid pressure data received from API");
-            }
-
             List<DailyWeather> dailyForecasts = processDailyWeather(weatherData);
             return createWeatherForecastResponse(dailyForecasts);
             
+        } catch (WebClientResponseException e) {
+            log.error("API response error for lat: {} lon: {} - Status: {}", latitude, longitude, e.getStatusCode());
+            throw new ExternalServiceException(
+                "Weather API returned error: " + e.getStatusText(), 
+                e, 
+                e.getStatusCode().value()
+            );
+        } catch (WebClientException e) {
+            log.error("Network error fetching forecast for lat: {} lon: {}", latitude, longitude, e);
+            throw new ExternalServiceException(
+                "Network error while fetching weather data", 
+                e, 
+                503
+            );
+        } catch (WeatherDataProcessingException | LocationValidationException e) {
+            // Re-throw specific exceptions
+            throw e;
         } catch (Exception e) {
-            log.error("Error fetching forecast for lat: {} lon: {}", latitude, longitude, e);
-            throw new RuntimeException("Failed to fetch weather forecast: " + e.getMessage(), e);
+            log.error("Unexpected error fetching forecast for lat: {} lon: {}", latitude, longitude, e);
+            throw new WeatherDataProcessingException(
+                "Failed to fetch weather forecast: " + e.getMessage(), 
+                e
+            );
         }
+    }
+    
+    private void validateLocation(double latitude, double longitude) {
+        if (latitude < -90 || latitude > 90) {
+            throw new LocationValidationException(
+                "Invalid latitude: " + latitude + ". Must be between -90 and 90"
+            );
+        }
+        if (longitude < -180 || longitude > 180) {
+            throw new LocationValidationException(
+                "Invalid longitude: " + longitude + ". Must be between -180 and 180"
+            );
+        }
+    }
+    
+    private JsonNode fetchWeatherData(double latitude, double longitude) {
+        JsonNode weatherData = meteoClient.getWeatherForecast(latitude, longitude)
+            .block(Duration.ofSeconds(10));
+            
+        if (weatherData == null || !weatherData.has("daily")) {
+            log.error("Invalid weather data received from API");
+            throw new ExternalServiceException(
+                "Invalid weather data received from API", 
+                500
+            );
+        }
+        
+        return weatherData;
+    }
+    
+    private JsonNode fetchPressureData(double latitude, double longitude) {
+        JsonNode pressureData = meteoClient.getPressureData(latitude, longitude)
+            .block(Duration.ofSeconds(10));
+            
+        if (pressureData == null || !pressureData.has("hourly")) {
+            log.error("Invalid pressure data received from API");
+            throw new ExternalServiceException(
+                "Invalid pressure data received from API", 
+                500
+            );
+        }
+        
+        return pressureData;
     }
 
     private List<DailyWeather> processDailyWeather(JsonNode weatherData) {
@@ -60,17 +117,16 @@ public class WeatherService {
             JsonNode daily = weatherData.get("daily");
 
             if (!hasRequiredFields(daily)) {
-                throw new RuntimeException("Missing required weather data fields");
+                throw new WeatherDataProcessingException("Missing required weather data fields");
             }
 
-            // Używamy Java Streams do przetwarzania danych
             return IntStream.range(0, 7)
                 .mapToObj(i -> processSingleDay(daily, i))
                 .toList();
                 
         } catch (Exception e) {
             log.error("Error processing weather data: {}", e.getMessage());
-            throw new RuntimeException("Failed to process weather data", e);
+            throw new WeatherDataProcessingException("Failed to process weather data", e);
         }
     }
     
@@ -110,7 +166,10 @@ public class WeatherService {
                 
         } catch (Exception e) {
             log.error("Error processing weather data for day {}: {}", dayIndex, e.getMessage());
-            throw new RuntimeException("Error processing daily weather data", e);
+            throw new WeatherDataProcessingException(
+                "Error processing daily weather data for day " + dayIndex, 
+                e
+            );
         }
     }
 
@@ -119,7 +178,7 @@ public class WeatherService {
             return Duration.between(sunrise, sunset).toHours();
         } catch (Exception e) {
             log.error("Error calculating sun exposure hours: {}", e.getMessage());
-            throw new RuntimeException("Error calculating sun exposure", e);
+            throw new WeatherDataProcessingException("Error calculating sun exposure", e);
         }
     }
 
@@ -142,7 +201,7 @@ public class WeatherService {
                 
         } catch (Exception e) {
             log.error("Error creating weather forecast response: {}", e.getMessage());
-            throw new RuntimeException("Failed to create weather forecast response", e);
+            throw new WeatherDataProcessingException("Failed to create weather forecast response", e);
         }
     }
 
@@ -150,17 +209,19 @@ public class WeatherService {
         try {
             JsonNode hourlyPressure = pressureData.get("hourly").get("pressure_msl");
             if (hourlyPressure == null) {
-                throw new RuntimeException("Missing pressure data");
+                throw new WeatherDataProcessingException("Missing pressure data");
             }
 
             return StreamSupport.stream(hourlyPressure.spliterator(), false)
                 .mapToDouble(JsonNode::asDouble)
                 .average()
-                .orElseThrow(() -> new RuntimeException("Error calculating average pressure"));
+                .orElseThrow(() -> new WeatherDataProcessingException("Error calculating average pressure"));
                 
+        } catch (WeatherDataProcessingException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Error calculating average pressure: {}", e.getMessage());
-            throw new RuntimeException("Failed to calculate average pressure", e);
+            throw new WeatherDataProcessingException("Failed to calculate average pressure", e);
         }
     }
 
@@ -169,11 +230,13 @@ public class WeatherService {
             return dailyForecasts.stream()
                 .mapToDouble(DailyWeather::getSolarEnergy)
                 .average()
-                .orElseThrow(() -> new RuntimeException("Error calculating average sun exposure"));
+                .orElseThrow(() -> new WeatherDataProcessingException("Error calculating average sun exposure"));
                 
+        } catch (WeatherDataProcessingException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Error calculating average sun exposure: {}", e.getMessage());
-            throw new RuntimeException("Failed to calculate average sun exposure", e);
+            throw new WeatherDataProcessingException("Failed to calculate average sun exposure", e);
         }
     }
 
@@ -182,11 +245,13 @@ public class WeatherService {
             return dailyForecasts.stream()
                 .mapToDouble(DailyWeather::getMinTemperature)
                 .min()
-                .orElseThrow(() -> new RuntimeException("Error finding minimum temperature"));
+                .orElseThrow(() -> new WeatherDataProcessingException("Error finding minimum temperature"));
                 
+        } catch (WeatherDataProcessingException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Error finding minimum temperature: {}", e.getMessage());
-            throw new RuntimeException("Failed to find minimum temperature", e);
+            throw new WeatherDataProcessingException("Failed to find minimum temperature", e);
         }
     }
 
@@ -195,11 +260,13 @@ public class WeatherService {
             return dailyForecasts.stream()
                 .mapToDouble(DailyWeather::getMaxTemperature)
                 .max()
-                .orElseThrow(() -> new RuntimeException("Error finding maximum temperature"));
+                .orElseThrow(() -> new WeatherDataProcessingException("Error finding maximum temperature"));
                 
+        } catch (WeatherDataProcessingException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Error finding maximum temperature: {}", e.getMessage());
-            throw new RuntimeException("Failed to find maximum temperature", e);
+            throw new WeatherDataProcessingException("Failed to find maximum temperature", e);
         }
     }
 
@@ -213,7 +280,7 @@ public class WeatherService {
             
         } catch (Exception e) {
             log.error("Error generating weather summary: {}", e.getMessage());
-            throw new RuntimeException("Failed to generate weather summary", e);
+            throw new WeatherDataProcessingException("Failed to generate weather summary", e);
         }
     }
 
@@ -229,9 +296,12 @@ public class WeatherService {
                 .weatherSummary(forecast.getWeatherSummary())
                 .build();
                 
+        } catch (LocationValidationException | WeatherDataProcessingException | ExternalServiceException e) {
+            // Re-throw specific exceptions
+            throw e;
         } catch (Exception e) {
             log.error("Error getting weekly summary for lat: {} lon: {}", latitude, longitude, e);
-            throw new RuntimeException("Failed to get weekly summary", e);
+            throw new WeatherDataProcessingException("Failed to get weekly summary", e);
         }
     }
 }
