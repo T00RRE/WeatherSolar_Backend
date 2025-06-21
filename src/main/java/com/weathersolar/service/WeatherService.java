@@ -29,6 +29,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class WeatherService {
     private final OpenMeteoClient meteoClient;
+    private final SolarEnergyCalculator solarEnergyCalculator;
     private JsonNode pressureData;
 
     public WeatherForecastResponse getForecast(double latitude, double longitude) {
@@ -58,7 +59,6 @@ public class WeatherService {
                 503
             );
         } catch (WeatherDataProcessingException | LocationValidationException e) {
-            // Re-throw specific exceptions
             throw e;
         } catch (Exception e) {
             log.error("Unexpected error fetching forecast for lat: {} lon: {}", latitude, longitude, e);
@@ -153,7 +153,7 @@ public class WeatherService {
             LocalTime sunset = LocalTime.parse(daily.get("sunset").get(dayIndex).asText().split("T")[1]);
             
             double sunExposureHours = calculateSunExposureHours(sunrise, sunset);
-            double solarEnergy = SolarEnergyCalculator.calculateDailySolarEnergy(sunExposureHours);
+            double solarEnergy = solarEnergyCalculator.calculateDailySolarEnergy(sunExposureHours);
 
             return DailyWeather.builder()
                 .date(date)
@@ -297,7 +297,6 @@ public class WeatherService {
                 .build();
                 
         } catch (LocationValidationException | WeatherDataProcessingException | ExternalServiceException e) {
-            // Re-throw specific exceptions
             throw e;
         } catch (Exception e) {
             log.error("Error getting weekly summary for lat: {} lon: {}", latitude, longitude, e);

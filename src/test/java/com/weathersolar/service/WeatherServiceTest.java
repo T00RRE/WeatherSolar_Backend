@@ -17,6 +17,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.weathersolar.Model.DailyWeather;
 import com.weathersolar.client.OpenMeteoClient;
 import com.weathersolar.dto.WeatherForecastResponse;
+import com.weathersolar.utils.SolarEnergyCalculator;
 
 import reactor.core.publisher.Mono;
 
@@ -24,6 +25,8 @@ class WeatherServiceTest {
 
    @Mock
    private OpenMeteoClient meteoClient;
+   @Mock
+   private SolarEnergyCalculator solarEnergyCalculator;
 
    private WeatherService weatherService;
    private ObjectMapper objectMapper;
@@ -31,13 +34,14 @@ class WeatherServiceTest {
    @BeforeEach
    void setUp() {
        MockitoAnnotations.openMocks(this);
-       weatherService = new WeatherService(meteoClient); // Tylko OpenMeteoClient!
+       weatherService = new WeatherService(meteoClient, solarEnergyCalculator);
        objectMapper = new ObjectMapper();
+       // domyślne mockowanie energii słonecznej
+       when(solarEnergyCalculator.calculateDailySolarEnergy(anyDouble())).thenReturn(10.0);
    }
 
    @Test
    void shouldReturnWeatherForecast() throws Exception {
-       // given
        String weatherJson = """
            {
                "daily": {
@@ -68,10 +72,8 @@ class WeatherServiceTest {
        when(meteoClient.getPressureData(anyDouble(), anyDouble()))
            .thenReturn(Mono.just(pressureData));
 
-       // when
        WeatherForecastResponse response = weatherService.getForecast(52.0, 21.0);
 
-       // then
        assertNotNull(response);
        assertFalse(response.getDailyForecasts().isEmpty());
        
@@ -79,13 +81,11 @@ class WeatherServiceTest {
        assertEquals(LocalDate.parse("2024-01-01"), firstDay.getDate());
        assertEquals(20.5, firstDay.getMaxTemperature());
        assertEquals(10.5, firstDay.getMinTemperature());
-       // Solar energy będzie obliczona przez SolarEnergyCalculator
        assertEquals(1, firstDay.getWeatherCode());
    }
 
    @Test
    void shouldCalculateAverages() throws Exception {
-       // given
        String weatherJson = """
            {
                "daily": {
@@ -116,10 +116,8 @@ class WeatherServiceTest {
        when(meteoClient.getPressureData(anyDouble(), anyDouble()))
            .thenReturn(Mono.just(pressureData));
 
-       // when
        WeatherForecastResponse response = weatherService.getForecast(52.0, 21.0);
 
-       // then
        assertNotNull(response);
        assertEquals(2, response.getDailyForecasts().size());
        assertEquals(1013.5, response.getAveragePressure(), 0.1);

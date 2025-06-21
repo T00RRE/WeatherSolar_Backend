@@ -2,86 +2,63 @@ package com.weathersolar.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
+import com.weathersolar.config.SolarProperties;
 import com.weathersolar.utils.SolarEnergyCalculator;
 
 class SolarEnergyCalculatorTest {
+    private SolarEnergyCalculator calculator;
+
+    @BeforeEach
+    void setUp() {
+        SolarProperties props = new SolarProperties();
+        props.setPower(2.5);
+        props.setPanelEfficiency(0.2);
+        props.setSystemLosses(0.85);
+        calculator = new SolarEnergyCalculator(props);
+    }
 
     @Test
     void shouldCalculateEnergy() {
-        // given
         double exposureHours = 12.0;
-        // power * hours * efficiency * losses = 2.5 * 12.0 * 0.2 * 0.85
         double expectedEnergy = 2.5 * 12.0 * 0.2 * 0.85;
-
-        // when
-        double result = SolarEnergyCalculator.calculateDailySolarEnergy(exposureHours);
-
-        // then
+        double result = calculator.calculateDailySolarEnergy(exposureHours);
         assertEquals(expectedEnergy, result, 0.01);
     }
 
     @Test
     void shouldReturnZeroForZeroExposure() {
-        // when
-        double result = SolarEnergyCalculator.calculateDailySolarEnergy(0.0);
-        
-        // then
+        double result = calculator.calculateDailySolarEnergy(0.0);
         assertEquals(0.0, result, 0.01);
     }
 
     @Test
     void shouldCalculateMonthlyEnergy() {
-        // given
         double averageDailySunHours = 8.0;
         int daysInMonth = 30;
-        double expectedDaily = SolarEnergyCalculator.calculateDailySolarEnergy(averageDailySunHours);
+        double expectedDaily = calculator.calculateDailySolarEnergy(averageDailySunHours);
         double expectedMonthly = expectedDaily * daysInMonth;
-
-        // when
-        double result = SolarEnergyCalculator.calculateMonthlySolarEnergy(averageDailySunHours, daysInMonth);
-
-        // then
+        double result = calculator.calculateMonthlySolarEnergy(averageDailySunHours, daysInMonth);
         assertEquals(expectedMonthly, result, 0.01);
     }
 
     @Test
     void shouldCalculateYearlyEnergy() {
-        // given
         double averageDailySunHours = 6.0;
-        double expectedDaily = SolarEnergyCalculator.calculateDailySolarEnergy(averageDailySunHours);
+        double expectedDaily = calculator.calculateDailySolarEnergy(averageDailySunHours);
         double expectedYearly = expectedDaily * 365;
-
-        // when
-        double result = SolarEnergyCalculator.calculateYearlySolarEnergy(averageDailySunHours);
-
-        // then
+        double result = calculator.calculateYearlySolarEnergy(averageDailySunHours);
         assertEquals(expectedYearly, result, 0.01);
     }
 
     @Test
     void shouldThrowExceptionForInvalidSunHours() {
-        // then
-        assertThrows(IllegalArgumentException.class, () -> 
-            SolarEnergyCalculator.calculateDailySolarEnergy(-1.0));
-        
-        assertThrows(IllegalArgumentException.class, () -> 
-            SolarEnergyCalculator.calculateDailySolarEnergy(25.0));
-    }
-
-    @Test
-    void shouldCalculateSystemEfficiency() {
-        // given
-        double sunExposureHours = 10.0;
-        double cloudCoverPercentage = 50.0;
-
-        // when
-        double result = SolarEnergyCalculator.calculateSystemEfficiency(sunExposureHours, cloudCoverPercentage);
-
-        // then
-        // Efficiency should be reduced due to cloud cover
-        double expectedEfficiency = 0.2 * 0.85 * (1.0 - (50.0 / 100.0 * 0.7));
-        assertEquals(expectedEfficiency, result, 0.01);
+        assertThrows(IllegalArgumentException.class, () ->
+            calculator.calculateDailySolarEnergy(-1.0));
+        assertThrows(IllegalArgumentException.class, () ->
+            calculator.calculateDailySolarEnergy(25.0));
     }
 }

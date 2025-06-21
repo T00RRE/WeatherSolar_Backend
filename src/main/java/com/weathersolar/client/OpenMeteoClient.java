@@ -3,6 +3,7 @@ package com.weathersolar.client;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
@@ -16,19 +17,20 @@ import reactor.core.publisher.Mono;
 @Service
 public class OpenMeteoClient {
     private final WebClient webClient;
-    private static final String BASE_URL = "https://api.open-meteo.com/v1";
+    private final String baseUrl;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_DATE;
 
-    public OpenMeteoClient(WebClient.Builder webClientBuilder) {
+    public OpenMeteoClient(WebClient.Builder webClientBuilder, @Value("${zew.api.url}") String baseUrl) {
+        this.baseUrl = baseUrl;
         this.webClient = webClientBuilder
-            .baseUrl(BASE_URL)
+            .baseUrl(baseUrl)
             .build();
     }
 
     public Mono<JsonNode> getWeatherForecast(double latitude, double longitude) {
         String path = "/forecast";
         log.info("Fetching weather forecast from: {}{} for lat: {}, lon: {}", 
-                BASE_URL, path, latitude, longitude);
+                baseUrl, path, latitude, longitude);
 
         return webClient.get()
             .uri(uriBuilder -> uriBuilder
@@ -52,7 +54,7 @@ public class OpenMeteoClient {
     public Mono<JsonNode> getPressureData(double latitude, double longitude) {
         String path = "/forecast";
         log.info("Fetching pressure data from: {}{} for lat: {}, lon: {}", 
-                BASE_URL, path, latitude, longitude);
+                baseUrl, path, latitude, longitude);
 
         return webClient.get()
             .uri(uriBuilder -> uriBuilder

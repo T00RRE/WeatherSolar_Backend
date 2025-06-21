@@ -18,12 +18,11 @@ public class CorsConfig implements WebMvcConfigurer {
             .allowedOrigins(
                 "http://localhost:5173",
                 "http://localhost:5174",
-                "https://*.onrender.com",
                 "https://weather-app-backend-f2mz.onrender.com",
                 "https://weather-app-frontend-wheat.vercel.app",
                 "https://weather-app-frontend-4pp2.onrender.com"
             )
-            .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+            .allowedMethods("GET")
             .allowedHeaders("*")
             .allowCredentials(true)
             .maxAge(3600);
